@@ -16,9 +16,17 @@ string Edge<T>::toString() {
     // TODO: Return the string representation of the edge
     return "";
 }
-
-// TODO: Implement other methods of Edge:
-
+template <class T>
+bool Edge<T>::equals(Edge<T>* edge) {
+    if (edge == nullptr) return false;
+    return (this->from == edge->from) && (this->to == edge->to);
+}
+template <class T>
+bool Edge<T>::edgeEQ(Edge<T>*& edge1, Edge<T>*& edge2){
+    if (edge1 == nullptr && edge2 == nullptr) return true;
+    if (edge1 == nullptr || edge2 == nullptr) return false;
+    return edge1->equals(edge2);
+}
 
 // =============================================================================
 // Class VertexNode Implementation
@@ -36,8 +44,73 @@ VertexNode<T>::VertexNode(T vertex, bool (*vertexEQ)(T&, T&), string (*vertex2st
 template <class T>
 void VertexNode<T>::connect(VertexNode<T>* to, float weight) {
     // TODO: Connect this vertex to the 'to' vertex
+    // Edge already exists, update weight
+    for(Edge<T>* edge : adList) {
+        if (edge->to == to) {
+            edge->weight = weight;
+            return;
+        }
+    }
+    // Create new edge
+    Edge<T>* newEdge = new Edge<T>(this, to, weight);
+    adList.push_back(newEdge);
+
+    this->outDegree_++;
+    to->inDegree_++;
+}
+template <class T>
+T& VertexNode<T>::getVertex() {
+    return this->vertex;
 }
 
+template<class T>
+Edge<T>* VertexNode<T>::getEdge(VertexNode<T>* to) {
+    for (Edge<T>* edge : adList) {
+        if (edge->to == to) {
+            return edge;
+        }
+    }
+    return nullptr;
+}
+
+template <class T>
+bool VertexNode<T>::equals(VertexNode<T>* node){
+    if(node == nullptr) return false;
+
+    if(this->vertexEQ != nullptr){
+        return this->vertexEQ(this->vertex, node->vertex);
+    }
+    return this->vertex == node->vertex;
+}
+
+template <class T>
+void VertexNode<T>::removeTo(VertexNode<T>* to) {
+    for (auto it = adList.begin(); it != adList.end(); it++) {
+        if ((*it)->to == to) {
+            Edge<T>* edgeToRemove = *it;
+            delete edgeToRemove; // Free memory
+
+            adList.erase(it);
+            this->outDegree_--;
+            to->inDegree_--;
+            return;
+        }
+    }
+}
+template <class T>
+int VertexNode<T>::inDegree(){
+    return this->inDegree_;
+}
+
+template <class T>
+int VertexNode<T>::outDegree(){
+    return this->outDegree_;
+}
+
+template <class T>
+string VertexNode<T>::toString(){
+    
+}
 // =============================================================================
 // Class DGraphModel Implementation
 // =============================================================================

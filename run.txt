@@ -1,0 +1,2 @@
+g++ -o main main.cpp KnowledgeGraph.cpp -I . -std=c++17
+.\main.exe
