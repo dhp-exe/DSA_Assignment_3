@@ -88,7 +88,7 @@ void VertexNode<T>::removeTo(VertexNode<T>* to) {
     for (auto it = adList.begin(); it != adList.end(); it++) {
         if ((*it)->to == to) {
             Edge<T>* edgeToRemove = *it;
-            delete edgeToRemove; // Free memory
+            delete edgeToRemove;
 
             adList.erase(it);
             this->outDegree_--;
@@ -124,21 +124,251 @@ DGraphModel<T>::DGraphModel(bool (*vertexEQ)(T&, T&), string (*vertex2str)(T&)) 
 template <class T>
 DGraphModel<T>::~DGraphModel() {
     // TODO: Clear all vertices and edges to avoid memory leaks
+    this->clear();
+
+}
+
+template <class T>
+void DGraphModel<T>::clear() {
+    for (VertexNode<T>* node : nodeList) {
+        for (Edge<T>* edge : node->adList) {
+            delete edge;
+        }
+        node->adList.clear();
+    }
+    for (VertexNode<T>* node : nodeList) {
+        delete node;
+    }
+    nodeList.clear();
 }
 
 template <class T>
 void DGraphModel<T>::add(T vertex) {
     // TODO: Add a new vertex to the graph
+    if (this->contains(vertex)) {
+        return;
+    }
+    VertexNode<T>* newNode = new VertexNode<T>(vertex, this->vertexEQ, this->vertex2str);
+    nodeList.push_back(newNode);
 }
 
 template <class T>
 void DGraphModel<T>::connect(T from, T to, float weight) {
     // TODO: Connect two vertices 'from' and 'to'
+    VertexNode<T>* fromNode = this->getVertexNode(from);
+    VertexNode<T>* toNode = this->getVertexNode(to);
 
+    if(!fromNode) throw VertexNotFoundException("Vertex not found");
+    if(!toNode) throw VertexNotFoundException("Vertex not found");
+
+    fromNode->connect(toNode, weight);
 }
 
-// TODO: Implement other methods of DGraphModel:
+template <class T>
+void DGraphModel<T>::disconnect(T from, T to) {
+    VertexNode<T>* fromNode = this->getVertexNode(from);
+    VertexNode<T>* toNode = this->getVertexNode(to);
 
+    if(!fromNode) throw VertexNotFoundException("Vertex not found");
+    if(!toNode) throw VertexNotFoundException("Vertex not found");
+
+    fromNode->removeTo(toNode);
+}
+
+template <class T>
+bool DGraphModel<T>::contains(T vertex) {
+    return this->getVertexNode(vertex) != nullptr;
+}
+
+template <class T>
+bool DGraphModel<T>::connected(T from, T to) {
+    VertexNode<T>* fromNode = this->getVertexNode(from);
+    VertexNode<T>* toNode = this->getVertexNode(to);
+    if(!fromNode) throw VertexNotFoundException(this->vertex2Str(*fromNode));
+    if(!toNode) throw VertexNotFoundException(this->vertex2Str(*toNode));
+
+    Edge<T>* edge = fromNode->getEdge(toNode);
+    return edge != nullptr;
+}
+
+template <class T>
+VertexNode<T>* DGraphModel<T>::getVertexNode(T& vertex) {
+    for (VertexNode<T>* node : nodeList) {
+        if(this->vertexEq != nullptr){
+            if(this->vertexEQ(node->getVertex(), vertex)){
+                return node;
+            }
+        } 
+        else {
+            if (node->getVertex() == vertex) {
+                return node;
+            }
+        }
+    }
+    return nullptr;
+}
+
+template <class T>
+string DGraphModel<T>::vertex2Str(VertexNode<T>& node) {
+    if (this->vertex2str != nullptr) {
+        return this->vertex2str(node.getVertex());
+    }
+    return "";
+}
+
+template <class T>
+string DGraphModel<T>::edge2Str(Edge<T>& edge) {
+    return edge.toString();
+}
+
+template <class T>
+float DGraphModel<T>::weight(T from, T to) {
+    VertexNode<T>* fromNode = this->getVertexNode(from);
+    VertexNode<T>* toNode = this->getVertexNode(to);
+
+    if(!fromNode) throw VertexNotFoundException("Vertex not found");
+    if(!toNode) throw VertexNotFoundException("Vertex not found");
+
+    Edge<T>* edge = fromNode->getEdge(toNode);
+    if(!edge) throw EdgeNotFoundException("Edge not found");
+
+    return edge->weight;
+}
+
+template <class T>
+vector<T> DGraphModel<T>::getOutwardEdges(T from) {
+    VertexNode<T>* fromNode = this->getVertexNode(from);
+    if(!fromNode) throw VertexNotFoundException("Vertex not found");
+
+    vector<T> neighbors;
+    for (Edge<T>* edge : fromNode->adList) {
+        neighbors.push_back(edge->to->getVertex());
+    }
+    return neighbors;
+}
+
+template <class T>
+int DGraphModel<T>::size() {
+    return nodeList.size();
+}
+
+template <class T>
+bool DGraphModel<T>::empty() {
+    return nodeList.empty();
+}
+
+template <class T>
+int DGraphModel<T>::inDegree(T vertex) {
+    VertexNode<T>* node = this->getVertexNode(vertex);
+    if(!node) throw VertexNotFoundException("Vertex not found");
+    return node->inDegree();
+}
+
+template <class T>
+int DGraphModel<T>::outDegree(T vertex) {
+    VertexNode<T>* node = this->getVertexNode(vertex);
+    if(!node) throw VertexNotFoundException("Vertex not found");
+    return node->outDegree();
+}
+
+template <class T>
+vector<T> DGraphModel<T>::vertices() {
+    vector<T> v;
+    for (VertexNode<T>* node : nodeList) {
+        v.push_back(node->getVertex());
+    }
+    return v;
+}
+
+template <class T>
+string DGraphModel<T>::toString() {
+}
+
+template <class T>
+string DGraphModel<T>::BFS(T start) {
+    VertexNode<T>* startNode = this->getVertexNode(start);
+    if (!startNode) throw VertexNotFoundException("Start vertex not found");
+
+    vector<VertexNode<T>*> visited;
+    vector<VertexNode<T>*> queue; // using vector as queue
+    
+    queue.push_back(startNode);
+    visited.push_back(startNode);
+    
+    stringstream ss;
+    bool first = true;
+    int head = 0; 
+
+    while(head < queue.size()){
+        VertexNode<T>* current = queue[head];
+        head++; // Pop front
+
+        if (!first) ss << " ";
+        ss << this->vertex2Str(*current);
+        first = false;
+
+        for (Edge<T>* edge : current->adList) {
+            VertexNode<T>* neighbor = edge->to;
+            
+            bool isVisited = false;
+            for(VertexNode<T>* v : visited) {
+                if(v == neighbor) {
+                    isVisited = true; 
+                    break;
+                }
+            }
+
+            if (!isVisited) {
+                visited.push_back(neighbor);
+                queue.push_back(neighbor);
+            }
+        }
+    }
+    return ss.str();
+}
+
+template <class T>
+string DGraphModel<T>::DFS(T start) {
+    VertexNode<T>* startNode = this->getVertexNode(start);
+    if (!startNode) throw VertexNotFoundException("Start vertex not found");
+
+    vector<VertexNode<T>*> visited;
+    vector<VertexNode<T>*> stack; // using vector as stack
+    
+    stack.push_back(startNode);
+    
+    stringstream ss;
+    bool first = true;
+
+    while(!stack.empty()){
+        VertexNode<T>* current = stack.back();
+        stack.pop_back();
+
+        // Check visited
+        bool isVisited = false;
+        for(VertexNode<T>* v : visited) {
+            if(v == current) {
+                isVisited = true;
+                break;
+            }
+        }
+
+        if (!isVisited) {
+            visited.push_back(current);
+            
+            if (!first) ss << " ";
+            ss << this->vertex2Str(*current);
+            first = false;
+
+            // Push neighbors to stack in REVERSE order 
+            // so the first neighbor is at the top of the stack
+            for (int i = current->adList.size() - 1; i >= 0; i--) {
+                stack.push_back(current->adList[i]->to);
+            }
+        }
+    }
+    return ss.str();
+}
 // =============================================================================
 // Class KnowledgeGraph Implementation
 // =============================================================================
