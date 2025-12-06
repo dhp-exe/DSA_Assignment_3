@@ -310,15 +310,15 @@ string DGraphModel<T>::BFS(T start) {
         for (Edge<T>* edge : current->adList) {
             VertexNode<T>* neighbor = edge->to;
             
-            bool isVisited = false;
+            bool seen = false;
             for(VertexNode<T>* v : visited) {
                 if(v == neighbor) {
-                    isVisited = true; 
+                    seen = true; 
                     break;
                 }
             }
 
-            if (!isVisited) {
+            if (!seen) {
                 visited.push_back(neighbor);
                 queue.push_back(neighbor);
             }
@@ -345,15 +345,15 @@ string DGraphModel<T>::DFS(T start) {
         stack.pop_back();
 
         // Check visited
-        bool isVisited = false;
+        bool seen = false;
         for(VertexNode<T>* v : visited) {
             if(v == current) {
-                isVisited = true;
+                seen = true;
                 break;
             }
         }
 
-        if (!isVisited) {
+        if (!seen) {
             visited.push_back(current);
             
             if (!first) ss << " ";
@@ -379,12 +379,77 @@ KnowledgeGraph::KnowledgeGraph() {
 
 void KnowledgeGraph::addEntity(string entity) {
     // TODO: Add a new entity to the Knowledge Graph
+    if (graph.contains(entity)) {
+        throw EntityExistsException("Entity already exists!");
+    }
+    graph.add(entity);
+    entities.push_back(entity);
 }
 
 void KnowledgeGraph::addRelation(string from, string to, float weight) {
     // TODO: Add a directed relation
+    if (!graph.contains(from) || !graph.contains(to)) {
+        throw EntityNotFoundException("Entity not found!");
+    }
+    graph.connect(from, to, weight);
 }
 
+vector<string> KnowledgeGraph::getAllEntities() {
+    return graph.vertices();
+}
+
+vector<string> KnowledgeGraph::getNeighbors(string entity) {
+    if (!graph.contains(entity)) {
+        throw EntityNotFoundException("Entity not found!");
+    }
+    return graph.getOutwardEdges(entity);
+}
+
+string KnowledgeGraph::bfs(string start) {
+    if (!graph.contains(start)) throw EntityNotFoundException("Entity not found");
+    return graph.BFS(start);
+}
+
+string KnowledgeGraph::dfs(string start) {
+    if (!graph.contains(start)) throw EntityNotFoundException("Entity not found");
+    return graph.DFS(start);
+}
+
+bool KnowledgeGraph::isReachable(string from, string to) {
+    if (!graph.contains(from) || !graph.contains(to)) {
+        throw EntityNotFoundException("Entity not found!");
+    }
+    vector<string> q;
+    vector<string> visited;
+    q.push_back(from);
+    visited.push_back(from);
+
+    int head = 0;
+    while (head < q.size()) {
+        string current = q[head];
+        head++;
+        if (current == to) return true;
+
+        vector<string> neighbors = graph.getOutwardEdges(current);
+        for (const string& neighbor : neighbors) {
+            bool seen = false;
+            for (const string& v : visited) {
+                if (v == neighbor) {
+                    seen = true;
+                    break;
+                }
+            }
+            if (!seen) {
+                visited.push_back(neighbor);
+                q.push_back(neighbor);
+            }
+        }
+    }
+    return false;
+}
+string KnowledgeGraph::toString() {
+    return graph.toString();
+}
 // TODO: Implement other methods of KnowledgeGraph:
 
 
