@@ -450,9 +450,111 @@ bool KnowledgeGraph::isReachable(string from, string to) {
 string KnowledgeGraph::toString() {
     return graph.toString();
 }
-// TODO: Implement other methods of KnowledgeGraph:
 
+vector<string> KnowledgeGraph::getRelatedEntities(string entity, int depth) {
+    if (!graph.contains(entity)) throw EntityNotFoundException("Entity not found");
+    
+    vector<string> result;
+    vector<pair<string, int>> q; //used as queue
+    vector<string> visited;
+    
+    q.push_back({entity, 0});
+    visited.push_back(entity);
+    
+    int head = 0;
+    while(head < q.size()){
+        pair<string, int> current = q[head++];
+        string name = current.first;
+        int d = current.second;
+        
+        if(d > 0) result.push_back(name); // Add if related (depth > 0)
+        
+        if(d < depth){
+            vector<string> neighbors = graph.getOutwardEdges(name);
+            for(string n : neighbors){
+                bool seen = false;
+                for(string v : visited) if(v == n) seen = true;
+                
+                if(!seen){
+                    visited.push_back(n);
+                    q.push_back({n, d + 1});
+                }
+            }
+        }
+    }
+    return result;
+}
 
+string KnowledgeGraph::findCommonAncestors(string entity1, string entity2) {
+    if (!graph.contains(entity1) || !graph.contains(entity2)) {
+        throw EntityNotFoundException("Entity not found");
+    }
+    
+    // NOTE: This requires "Reverse DFS/BFS" to find parents.
+    // DGraphModel doesn't have "getInwardEdges". 
+    // We must scan the whole graph to find parents (inefficient but only way).
+    
+    auto getParents = [&](string target) -> vector<string> {
+        vector<string> parents;
+        for(string potentialParent : entities) {
+            if(graph.connected(potentialParent, target)) {
+                parents.push_back(potentialParent);
+            }
+        }
+        return parents;
+    };
+    
+    // 1. Find all ancestors of entity1
+    vector<string> ancestors1;
+    vector<string> q1;
+    q1.push_back(entity1);
+    int h1 = 0;
+    while(h1 < q1.size()){
+        string curr = q1[h1++];
+        vector<string> pars = getParents(curr);
+        for(string p : pars){
+            bool seen = false;
+            for(string a : ancestors1) if(a == p) seen = true;
+            // Also check queue
+            for(string q : q1) if(q == p) seen = true;
+            
+            if(!seen){
+                ancestors1.push_back(p);
+                q1.push_back(p);
+            }
+        }
+    }
+    
+    // 2. Find ancestors of entity2 and check for intersection
+    // We want the "nearest", so we do BFS on parents of entity 2
+    vector<string> q2;
+    q2.push_back(entity2);
+    vector<string> visited2; 
+    visited2.push_back(entity2);
+    
+    int h2 = 0;
+    while(h2 < q2.size()){
+        string curr = q2[h2++];
+        
+        // Check if this current ancestor is in ancestors1
+        for(string a : ancestors1){
+            if(a == curr) return curr; // Found the nearest common one
+        }
+        
+        vector<string> pars = getParents(curr);
+        for(string p : pars){
+            bool seen = false;
+            for(string v : visited2) if(v == p) seen = true;
+            
+            if(!seen){
+                visited2.push_back(p);
+                q2.push_back(p);
+            }
+        }
+    }
+
+    return "No common ancestor";
+}
 
 // =============================================================================
 // Explicit Template Instantiation
