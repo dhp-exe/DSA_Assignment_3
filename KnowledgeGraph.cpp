@@ -1,4 +1,10 @@
 #include "KnowledgeGraph.h"
+#include <unordered_map>
+#include <unordered_set>
+#include <queue>
+#include <limits>
+#include <functional>
+#include <cmath>
 
 // =============================================================================
 // Class Edge Implementation
@@ -13,8 +19,14 @@ Edge<T>::Edge(VertexNode<T>* from, VertexNode<T>* to, float weight) {
 
 template <class T>
 string Edge<T>::toString() {
-    // TODO: Return the string representation of the edge
-    return "";
+    stringstream ss;
+    // Format: (<from>, <to>, <weight>)
+    ss << "(";
+    ss << (from ? (from->vertex2str ? from->vertex2str(from->vertex) : "NULL") : "NULL"); // Handle from
+    ss << ", ";
+    ss << (to ? (to->vertex2str ? to->vertex2str(to->vertex) : "NULL") : "NULL");       // Handle to
+    ss << ", " << weight << ")";
+    return ss.str();
 }
 template <class T>
 bool Edge<T>::equals(Edge<T>* edge) {
@@ -109,7 +121,19 @@ int VertexNode<T>::outDegree(){
 
 template <class T>
 string VertexNode<T>::toString(){
+    stringstream ss;
+    // Format: (<value>, <in>, <out>, [<edges>])
+    ss << "(";
+    ss << (vertex2str ? vertex2str(vertex) : ""); // Print value
+    ss << ", " << inDegree_ << ", " << outDegree_ << ", [";
     
+    for (size_t i = 0; i < adList.size(); ++i) {
+        if (i > 0) ss << ", ";
+        ss << adList[i]->toString();
+    }
+    
+    ss << "])";
+    return ss.str();
 }
 // =============================================================================
 // Class DGraphModel Implementation
@@ -184,8 +208,8 @@ template <class T>
 bool DGraphModel<T>::connected(T from, T to) {
     VertexNode<T>* fromNode = this->getVertexNode(from);
     VertexNode<T>* toNode = this->getVertexNode(to);
-    if(!fromNode) throw VertexNotFoundException(this->vertex2Str(*fromNode));
-    if(!toNode) throw VertexNotFoundException(this->vertex2Str(*toNode));
+    if(!fromNode) throw VertexNotFoundException("Vertex not found");
+    if(!toNode) throw VertexNotFoundException("Vertex not found");
 
     Edge<T>* edge = fromNode->getEdge(toNode);
     return edge != nullptr;
@@ -194,7 +218,7 @@ bool DGraphModel<T>::connected(T from, T to) {
 template <class T>
 VertexNode<T>* DGraphModel<T>::getVertexNode(T& vertex) {
     for (VertexNode<T>* node : nodeList) {
-        if(this->vertexEq != nullptr){
+        if(this->vertexEQ != nullptr){
             if(this->vertexEQ(node->getVertex(), vertex)){
                 return node;
             }
@@ -236,15 +260,11 @@ float DGraphModel<T>::weight(T from, T to) {
 }
 
 template <class T>
-vector<T> DGraphModel<T>::getOutwardEdges(T from) {
+vector<Edge<T>*> DGraphModel<T>::getOutwardEdges(T from) {
     VertexNode<T>* fromNode = this->getVertexNode(from);
     if(!fromNode) throw VertexNotFoundException("Vertex not found");
 
-    vector<T> neighbors;
-    for (Edge<T>* edge : fromNode->adList) {
-        neighbors.push_back(edge->to->getVertex());
-    }
-    return neighbors;
+    return fromNode->adList;
 }
 
 template <class T>
@@ -282,91 +302,88 @@ vector<T> DGraphModel<T>::vertices() {
 
 template <class T>
 string DGraphModel<T>::toString() {
+    stringstream ss;
+    ss << "[";
+    for (size_t i = 0; i < nodeList.size(); ++i) {
+        if (i > 0) ss << ", ";
+        ss << nodeList[i]->toString();
+    }
+    ss << "]";
+    return ss.str();
 }
 
+// Format [<node1>, <node2>]
 template <class T>
 string DGraphModel<T>::BFS(T start) {
     VertexNode<T>* startNode = this->getVertexNode(start);
     if (!startNode) throw VertexNotFoundException("Start vertex not found");
 
     vector<VertexNode<T>*> visited;
-    vector<VertexNode<T>*> queue; // using vector as queue
-    
+    vector<VertexNode<T>*> queue; 
     queue.push_back(startNode);
     visited.push_back(startNode);
     
     stringstream ss;
+    ss << "[";
+    
+    int head = 0;
     bool first = true;
-    int head = 0; 
-
     while(head < queue.size()){
-        VertexNode<T>* current = queue[head];
-        head++; // Pop front
-
-        if (!first) ss << " ";
-        ss << this->vertex2Str(*current);
+        VertexNode<T>* current = queue[head++];
+        
+        if (!first) ss << ", ";
+        ss << current->toString(); // use toString() of VertexNode
         first = false;
 
         for (Edge<T>* edge : current->adList) {
             VertexNode<T>* neighbor = edge->to;
-            
             bool seen = false;
-            for(VertexNode<T>* v : visited) {
-                if(v == neighbor) {
-                    seen = true; 
-                    break;
-                }
-            }
-
+            for(auto v : visited) if(v == neighbor) seen = true;
+            
             if (!seen) {
                 visited.push_back(neighbor);
                 queue.push_back(neighbor);
             }
         }
     }
+    ss << "]";
     return ss.str();
 }
 
+// Format [<node1>, <node2>]
 template <class T>
 string DGraphModel<T>::DFS(T start) {
     VertexNode<T>* startNode = this->getVertexNode(start);
     if (!startNode) throw VertexNotFoundException("Start vertex not found");
 
     vector<VertexNode<T>*> visited;
-    vector<VertexNode<T>*> stack; // using vector as stack
-    
+    vector<VertexNode<T>*> stack;
     stack.push_back(startNode);
     
     stringstream ss;
+    ss << "[";
     bool first = true;
 
     while(!stack.empty()){
         VertexNode<T>* current = stack.back();
         stack.pop_back();
 
-        // Check visited
         bool seen = false;
-        for(VertexNode<T>* v : visited) {
-            if(v == current) {
-                seen = true;
-                break;
-            }
-        }
+        for(auto v : visited) if(v == current) seen = true;
 
         if (!seen) {
             visited.push_back(current);
-            
-            if (!first) ss << " ";
-            ss << this->vertex2Str(*current);
+            if (!first) ss << ", ";
+            ss << current->toString(); // use toString() of VertexNode
             first = false;
 
-            // Push neighbors to stack in REVERSE order 
-            // so the first neighbor is at the top of the stack
+            // Push neighbors in reverse to maintain order
             for (int i = current->adList.size() - 1; i >= 0; i--) {
                 stack.push_back(current->adList[i]->to);
             }
         }
     }
+    ss << "]";
     return ss.str();
 }
 // =============================================================================
@@ -395,14 +412,24 @@ void KnowledgeGraph::addRelation(string from, string to, float weight) {
 }
 
 vector<string> KnowledgeGraph::getAllEntities() {
-    return graph.vertices();
+    return entities;
 }
 
 vector<string> KnowledgeGraph::getNeighbors(string entity) {
     if (!graph.contains(entity)) {
         throw EntityNotFoundException("Entity not found!");
     }
-    return graph.getOutwardEdges(entity);
+    
+    // Get the list of Edge pointers
+    vector<Edge<string>*> edges = graph.getOutwardEdges(entity);
+    vector<string> neighbors;
+    
+    for (Edge<string>* edge : edges) {
+        // Use the public getter instead of direct access
+        neighbors.push_back(edge->getTo()->getVertex());
+    }
+    
+    return neighbors;
 }
 
 string KnowledgeGraph::bfs(string start) {
@@ -430,8 +457,9 @@ bool KnowledgeGraph::isReachable(string from, string to) {
         head++;
         if (current == to) return true;
 
-        vector<string> neighbors = graph.getOutwardEdges(current);
-        for (const string& neighbor : neighbors) {
+        vector<Edge<string>*> edges = graph.getOutwardEdges(current);
+        for (Edge<string>* edge : edges) {
+            string neighbor = edge->getTo()->getVertex();
             bool seen = false;
             for (const string& v : visited) {
                 if (v == neighbor) {
@@ -470,8 +498,9 @@ vector<string> KnowledgeGraph::getRelatedEntities(string entity, int depth) {
         if(d > 0) result.push_back(name); // Add if related (depth > 0)
         
         if(d < depth){
-            vector<string> neighbors = graph.getOutwardEdges(name);
-            for(string n : neighbors){
+            vector<Edge<string>*> edges = graph.getOutwardEdges(name);
+            for (Edge<string>* edge : edges) {
+                string n = edge->getTo()->getVertex();
                 bool seen = false;
                 for(string v : visited) if(v == n) seen = true;
                 
@@ -490,70 +519,96 @@ string KnowledgeGraph::findCommonAncestors(string entity1, string entity2) {
         throw EntityNotFoundException("Entity not found");
     }
     
-    // NOTE: This requires "Reverse DFS/BFS" to find parents.
-    // DGraphModel doesn't have "getInwardEdges". 
-    // We must scan the whole graph to find parents (inefficient but only way).
-    
-    auto getParents = [&](string target) -> vector<string> {
+    // Helper: get direct parents (incoming neighbors) of a node by scanning entities
+    auto getParents = [&](const string &target) -> vector<string> {
         vector<string> parents;
-        for(string potentialParent : entities) {
-            if(graph.connected(potentialParent, target)) {
+        for (const string &potentialParent : entities) {
+            if (graph.connected(potentialParent, target)) {
                 parents.push_back(potentialParent);
             }
         }
         return parents;
     };
-    
-    // 1. Find all ancestors of entity1
-    vector<string> ancestors1;
-    vector<string> q1;
-    q1.push_back(entity1);
-    int h1 = 0;
-    while(h1 < q1.size()){
-        string curr = q1[h1++];
-        vector<string> pars = getParents(curr);
-        for(string p : pars){
-            bool seen = false;
-            for(string a : ancestors1) if(a == p) seen = true;
-            // Also check queue
-            for(string q : q1) if(q == p) seen = true;
-            
-            if(!seen){
-                ancestors1.push_back(p);
-                q1.push_back(p);
+
+    // Collect all ancestors (reverse BFS) for a start node. Excludes the start node itself.
+    auto collectAncestors = [&](const string &start) -> unordered_set<string> {
+        unordered_set<string> ancestors;
+        vector<string> q;
+        q.push_back(start);
+        size_t head = 0;
+        while (head < q.size()) {
+            string curr = q[head++];
+            vector<string> pars = getParents(curr);
+            for (const string &p : pars) {
+                if (ancestors.insert(p).second) {
+                    q.push_back(p);
+                }
             }
         }
+        return ancestors;
+    };
+
+    unordered_set<string> ancestors1 = collectAncestors(entity1);
+    unordered_set<string> ancestors2 = collectAncestors(entity2);
+
+    // Intersection of ancestor sets
+    vector<string> common;
+    for (const string &a : ancestors1) {
+        if (ancestors2.count(a)) common.push_back(a);
     }
-    
-    // 2. Find ancestors of entity2 and check for intersection
-    // We want the "nearest", so we do BFS on parents of entity 2
-    vector<string> q2;
-    q2.push_back(entity2);
-    vector<string> visited2; 
-    visited2.push_back(entity2);
-    
-    int h2 = 0;
-    while(h2 < q2.size()){
-        string curr = q2[h2++];
-        
-        // Check if this current ancestor is in ancestors1
-        for(string a : ancestors1){
-            if(a == curr) return curr; // Found the nearest common one
-        }
-        
-        vector<string> pars = getParents(curr);
-        for(string p : pars){
-            bool seen = false;
-            for(string v : visited2) if(v == p) seen = true;
-            
-            if(!seen){
-                visited2.push_back(p);
-                q2.push_back(p);
+    if (common.empty()) return "No common ancestor";
+
+    // Dijkstra shortest path (by weight) from src -> dst. Returns +inf if unreachable.
+    auto shortestPath = [&](const string &src, const string &dst) -> double {
+        const double INF = std::numeric_limits<double>::infinity();
+        unordered_map<string, double> dist;
+        for (const string &v : entities) dist[v] = INF;
+
+        // min-heap by distance
+        auto cmp = [](const pair<double, string> &a, const pair<double, string> &b) { return a.first > b.first; };
+        priority_queue<pair<double, string>, vector<pair<double, string>>, decltype(cmp)> pq(cmp);
+
+        dist[src] = 0.0;
+        pq.push({0.0, src});
+
+        while (!pq.empty()) {
+            auto cur = pq.top(); pq.pop();
+            double d = cur.first;
+            const string u = cur.second;
+            if (d > dist[u]) continue;
+            if (u == dst) return d;
+
+            vector<Edge<string>*> edges = graph.getOutwardEdges(u);
+            for (Edge<string>* e : edges) {
+                string v = e->getTo()->getVertex();
+                double nd = d + e->getWeight();
+                if (nd < dist[v]) {
+                    dist[v] = nd;
+                    pq.push({nd, v});
+                }
             }
+        }
+        return std::numeric_limits<double>::infinity();
+    };
+
+    const double INF = std::numeric_limits<double>::infinity();
+    double bestScore = INF;
+    string bestAncestor = "";
+
+    // For each common ancestor, compute sum of shortest-path weights to both entities
+    for (const string &cand : common) {
+        double d1 = shortestPath(cand, entity1);
+        double d2 = shortestPath(cand, entity2);
+        if (d1 == INF || d2 == INF) continue; // must reach both
+        double total = d1 + d2;
+        if (total < bestScore) {
+            bestScore = total;
+            bestAncestor = cand;
         }
     }
 
-    return "No common ancestor";
+    if (bestAncestor.empty()) return "No common ancestor";
+    return bestAncestor;
 }
 
 // =============================================================================

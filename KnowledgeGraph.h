@@ -23,6 +23,11 @@ private:
 public:
     Edge(VertexNode<T>* from = nullptr, VertexNode<T>* to = nullptr, float weight = 0);
     
+    //getters
+    VertexNode<T>* getTo() const { return to; }
+    VertexNode<T>* getFrom() const { return from; }
+    float getWeight() const { return weight; }
+    
     bool equals(Edge<T>* edge);
     static bool edgeEQ(Edge<T>*& edge1, Edge<T>*& edge2);
     string toString();
@@ -91,7 +96,7 @@ public:
     void add(T vertex);
     bool contains(T vertex);
     float weight(T from, T to);
-    vector<T> getOutwardEdges(T from);
+    vector<Edge<T>*> getOutwardEdges(T from);
     
     void connect(T from, T to, float weight = 0);
     void disconnect(T from, T to);
