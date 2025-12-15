@@ -16,9 +16,14 @@ string Edge<T>::toString() {
     stringstream ss;
     // Format: (<from>, <to>, <weight>)
     ss << "(";
-    ss << (from ? (from->vertex2str ? from->vertex2str(from->vertex) : "NULL") : "NULL"); // Handle from
+    ss << (from ? (from->vertex2str ? from->vertex2str(from->vertex) : "NULL") : "NULL"); 
     ss << ", ";
-    ss << (to ? (to->vertex2str ? to->vertex2str(to->vertex) : "NULL") : "NULL");       // Handle to
+    ss << (to ? (to->vertex2str ? to->vertex2str(to->vertex) : "NULL") : "NULL");       
+    
+    // set precision for weight
+    ss.precision(6);
+    ss.setf(std::ios::fixed, std::ios::floatfield);
+    
     ss << ", " << weight << ")";
     return ss.str();
 }
@@ -75,7 +80,7 @@ T& VertexNode<T>::getVertex() {
 template<class T>
 Edge<T>* VertexNode<T>::getEdge(VertexNode<T>* to) {
     for (Edge<T>* edge : adList) {
-        if (edge->to == to) {
+        if (edge->to == to && edge->from == this) {
             return edge;
         }
     }
@@ -574,20 +579,36 @@ static vector<string> kg_getParents(const vector<string> &entities, DGraphModel<
     return parents;
 }
 
-// Collect all ancestors (reverse BFS) for a start node. Excludes the start node itself.
+// Collect all ancestors using Reverse DFS (Stack-based)
 static vector<string> kg_collectAncestors(const vector<string> &entities, DGraphModel<string> &graph, const string &start) {
-    vector<string> ancestors;
-    vector<string> q;
-    q.push_back(start);
-    size_t head = 0;
-    while (head < q.size()) {
-        string curr = q[head++];
+    vector<string> ancestors; // visited ancestors
+    vector<string> stack;     // Stack for DFS
+    
+    // 1. Get immediate parents of the start node to begin traversal
+    vector<string> firstParents = kg_getParents(entities, graph, start);
+    for(size_t i = 0; i < firstParents.size(); ++i) {
+        string p = firstParents[i];
+        if (!kg_containsVec(ancestors, p)) {
+            ancestors.push_back(p);
+            stack.push_back(p);
+        }
+    }
+    
+    // 2. Standard DFS Loop
+    while (!stack.empty()) {
+        // Pop from the back (LIFO - Last In First Out)
+        string curr = stack.back();
+        stack.pop_back();
+        
+        // Find parents of the current ancestor
         vector<string> pars = kg_getParents(entities, graph, curr);
         for (size_t i = 0; i < pars.size(); ++i) {
-            const string &p = pars[i];
+            string p = pars[i];
+            
+            // If not visited, mark visited and push to stack
             if (!kg_containsVec(ancestors, p)) {
                 ancestors.push_back(p);
-                q.push_back(p);
+                stack.push_back(p);
             }
         }
     }
@@ -639,31 +660,39 @@ static double kg_shortestPath(const vector<string> &entities, DGraphModel<string
 }
 
 string KnowledgeGraph::findCommonAncestors(string entity1, string entity2) {
+    // 1. Check existence
     if (!graph.contains(entity1) || !graph.contains(entity2)) {
         throw EntityNotFoundException("Entity not found");
     }
 
+    // 2. Find all ancestors using Reverse DFS
     vector<string> ancestors1 = kg_collectAncestors(entities, graph, entity1);
     vector<string> ancestors2 = kg_collectAncestors(entities, graph, entity2);
 
-    // Intersection of ancestor sets
+    // 3. Find Intersection
     vector<string> common;
     for (size_t i = 0; i < ancestors1.size(); ++i) {
-        const string &a = ancestors1[i];
-        if (kg_containsVec(ancestors2, a)) common.push_back(a);
+        if (kg_containsVec(ancestors2, ancestors1[i])) {
+            common.push_back(ancestors1[i]);
+        }
     }
+
     if (common.empty()) return "No common ancestor";
 
+    // 4. Find Best Ancestor (Shortest Path to both)
     const double INF = HUGE_VAL;
     double bestScore = INF;
     string bestAncestor = "";
 
-    // For each common ancestor, compute sum of shortest-path weights to both entities
     for (size_t i = 0; i < common.size(); ++i) {
-        const string &cand = common[i];
+        string cand = common[i];
+        
+        // Calculate distances from Ancestor -> Entity1 and Ancestor -> Entity2
         double d1 = kg_shortestPath(entities, graph, cand, entity1);
         double d2 = kg_shortestPath(entities, graph, cand, entity2);
-        if (d1 == INF || d2 == INF) continue; // must reach both
+        
+        if (d1 == INF || d2 == INF) continue; 
+        
         double total = d1 + d2;
         if (total < bestScore) {
             bestScore = total;

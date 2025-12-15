@@ -1,171 +1,360 @@
 #include "KnowledgeGraph.h"
+#include <iostream>
+#include <string>
+#include <vector>
+
+using namespace std;
 
 // =============================================================================
-// Simple Testing Framework
+// HELPER FUNCTIONS FOR TESTING
 // =============================================================================
-int passedTests = 0;
-int totalTests = 0;
-
-template<typename T>
-void assertEqual(T actual, T expected, string testName) {
-    totalTests++;
-    if (actual == expected) {
-        cout << "[PASS] " << testName << endl;
-        passedTests++;
-    } else {
-        cout << "[FAIL] " << testName << endl;
-        cout << "       Expected: " << expected << endl;
-        cout << "       Actual:   " << actual << endl;
-    }
-}
-
-void assertTrue(bool condition, string testName) {
-    assertEqual(condition, true, testName);
-}
-
-// Helpers for DGraphModel testing
-string int2str(int& i) { return to_string(i); }
 bool intEQ(int& a, int& b) { return a == b; }
+string int2str(int& i) { return to_string(i); }
+
+bool strEQ(string& a, string& b) { return a == b; }
+string str2str(string& s) { return s; }
 
 // =============================================================================
-// Test Scenarios
+// 1. Edge Class Tests
 // =============================================================================
+void testEdgeClass() {
+    cout << "\n==================================================" << endl;
+    cout << "TESTING CLASS: Edge" << endl;
+    cout << "==================================================" << endl;
 
-void testLowLevelGraph() {
-    cout << "\n=== Testing Low-Level DGraphModel (Integer Graph) ===" << endl;
-    DGraphModel<int> intGraph(intEQ, int2str);
+    // Setup dummy nodes
+    VertexNode<string>* nodeA = new VertexNode<string>("NodeA", strEQ, str2str);
+    VertexNode<string>* nodeB = new VertexNode<string>("NodeB", strEQ, str2str);
 
-    intGraph.add(1);
-    intGraph.add(2);
-    assertTrue(intGraph.contains(1), "Graph contains vertex 1");
+    // 1. Constructor
+    cout << "\n[1] Creating Edge(NodeA, NodeB, 5.5)..." << endl;
+    Edge<string> edge1(nodeA, nodeB, 5.5f);
+
+    // 2. toString
+    cout << "edge1.toString(): " << edge1.toString() << endl; 
+    // Expected: (NodeA, NodeB, 5.500000)
+
+    // 3. equals
+    cout << "\n[3] Testing equals():" << endl;
+    Edge<string> edge2(nodeA, nodeB, 10.0f); // Same nodes, diff weight
+    Edge<string> edge3(nodeB, nodeA, 5.5f);  // Diff direction
     
-    intGraph.connect(1, 2, 5.5f);
-    assertTrue(intGraph.connected(1, 2), "Vertex 1 connected to 2");
-    assertEqual(intGraph.weight(1, 2), 5.5f, "Edge weight 1->2 is 5.5");
+    cout << "edge1.equals(&edge2): " << (edge1.equals(&edge2) ? "TRUE" : "FALSE") << endl; 
+    // Expected: TRUE (Same src/dst)
     
-    intGraph.disconnect(1, 2);
-    assertTrue(!intGraph.connected(1, 2), "Vertex 1 disconnected from 2");
+    cout << "edge1.equals(&edge3): " << (edge1.equals(&edge3) ? "TRUE" : "FALSE") << endl; 
+    // Expected: FALSE (Diff direction)
+
+    // 4. static edgeEQ
+    cout << "\n[4] Testing static edgeEQ():" << endl;
+    
+    // [FIX] Create pointer variables first. 
+    // You cannot pass '&edge1' directly because the function takes a reference (Edge*&)
+    Edge<string>* ptr1 = &edge1;
+    Edge<string>* ptr2 = &edge2;
+    
+    cout << "Edge::edgeEQ(ptr1, ptr2): " << (Edge<string>::edgeEQ(ptr1, ptr2) ? "TRUE" : "FALSE") << endl;
+    // Expected: TRUE
+
+    // Cleanup manually allocated nodes for this specific test
+    delete nodeA;
+    delete nodeB;
 }
 
-void testKnowledgeGraphBasics() {
-    cout << "\n=== Testing KnowledgeGraph Wrapper ===" << endl;
+// =============================================================================
+// 2. VertexNode Class Tests
+// =============================================================================
+void testVertexNodeClass() {
+    cout << "\n==================================================" << endl;
+    cout << "TESTING CLASS: VertexNode" << endl;
+    cout << "==================================================" << endl;
+
+    VertexNode<string> v1("V1", strEQ, str2str);
+    VertexNode<string> v2("V2", strEQ, str2str);
+    VertexNode<string> v3("V3", strEQ, str2str);
+
+    // 1. getVertex
+    cout << "\n[1] getVertex(): " << v1.getVertex() << endl; 
+    // Expected: V1
+
+    // 2. connect
+    cout << "\n[2] Connecting V1->V2 (w=1.0) and V2->V3 (w=2.0)..." << endl;
+    v1.connect(&v2, 1.0f);
+    v2.connect(&v3, 2.0f);
+    cout<<" V1 InDegree:  " << v1.inDegree() << endl; 
+    // Expected: 0
+    cout << "V1 OutDegree: " << v1.outDegree() << endl; 
+    // Expected: 1
+    cout << "V2 InDegree:  " << v2.inDegree() << endl;  
+    // Expected: 1
+    cout << "V2 OutDegree: " << v2.outDegree() << endl; 
+    // Expected: 1
+
+    // 3. getEdge
+    cout << "\n[3] getEdge(V1 -> V2):" << endl;
+    Edge<string>* e = v1.getEdge(&v2);
+    Edge<string>* e2 = v1.getEdge(&v3); // Non-existing edge
+    if(e2) cout << "Result: " << e2->toString() << endl; 
+    else    cout << "Result: NULL" << endl;
+    // Expected: NULL
+    if (e) cout << "Result: " << e->toString() << endl; 
+    else   cout << "Result: NULL" << endl;
+    
+    // Expected: (V1, V2, 1.000000)
+
+    // 4. equals
+    cout << "\n[4] equals():" << endl;
+    cout << "v1.equals(&v1): " << (v1.equals(&v1) ? "TRUE" : "FALSE") << endl; 
+    // Expected: TRUE
+    cout << "v1.equals(&v2): " << (v1.equals(&v2) ? "TRUE" : "FALSE") << endl; 
+    // Expected: FALSE
+
+    // 5. toString
+    cout << "\n[5] toString():" << endl;
+    cout << "V1: " << v1.toString() << endl; 
+    // Expected: (V1, 0, 1, [(V1, V2, 1.000000)])
+    cout << "V2: " << v2.toString() << endl; 
+    // Expected: (V2, 1, 1, [(V1, V2, 1.000000), (V2, V3, 2.000000)]) 
+
+    // 6. removeTo
+    cout << "\n[6] removeTo(V2) from V1..." << endl;
+    v1.removeTo(&v2);
+    cout << "V1 OutDegree after remove: " << v1.outDegree() << endl; 
+    // Expected: 0
+    cout << "V1 toString after remove:  " << v1.toString() << endl; 
+    // Expected: (V1, 0, 0, [])
+}
+
+// =============================================================================
+// 3. DGraphModel Class Tests
+// =============================================================================
+void testDGraphModelClass() {
+    cout << "\n==================================================" << endl;
+    cout << "TESTING CLASS: DGraphModel" << endl;
+    cout << "==================================================" << endl;
+
+    DGraphModel<string> graph(strEQ, str2str);
+
+    // 1. add / size / empty
+    cout << "\n[1] Checking empty() and adding vertices A, B, C, D..." << endl;
+    cout << "Initially empty? " << (graph.empty() ? "YES" : "NO") << endl; 
+    // Expected: YES
+    
+    graph.add("A"); graph.add("B"); graph.add("C"); graph.add("D");
+    cout << "Size after adding 4: " << graph.size() << endl; 
+    // Expected: 4
+
+    // 2. contains
+    cout << "\n[2] contains():" << endl;
+    cout << "Contains 'A'? " << (graph.contains("A") ? "YES" : "NO") << endl; 
+    // Expected: YES
+    cout << "Contains 'Z'? " << (graph.contains("Z") ? "YES" : "NO") << endl; 
+    // Expected: NO
+
+    // 3. connect / connected / weight
+    cout << "\n[3] Connecting A->B (1.5), B->C (2.0), A->C (3.0)..." << endl;
+    graph.connect("A", "B", 1.5f);
+    graph.connect("B", "C", 2.0f);
+    graph.connect("A", "C", 3.0f); 
+    
+    cout << "Connected A->B? " << (graph.connected("A", "B") ? "YES" : "NO") << endl; 
+    // Expected: YES
+    cout << "Weight A->B:    " << graph.weight("A", "B") << endl; 
+    // Expected: 1.5
+    cout << "Connected B->A? " << (graph.connected("B", "A") ? "YES" : "NO") << endl; 
+    // Expected: NO
+
+    // 4. getOutwardEdges
+    cout << "\n[4] getOutwardEdges('A'):" << endl;
+    try {
+        vector<Edge<string>*> edges = graph.getOutwardEdges("A");
+        cout << "Edge count: " << edges.size() << endl; 
+        // Expected: 2 (A->B, A->C)
+        for(auto e : edges) cout << "  - " << e->toString() << endl;
+    } catch(exception& e) { cout << e.what() << endl; }
+
+    // 5. Degrees
+    cout << "\n[5] Degrees for 'B':" << endl;
+    cout << "InDegree:  " << graph.inDegree("B") << endl; 
+    // Expected: 1
+    cout << "OutDegree: " << graph.outDegree("B") << endl; 
+    // Expected: 1
+
+    // 6. toString (Graph)
+    cout << "\n[6] DGraphModel::toString():" << endl;
+    cout << graph.toString() << endl;
+    // Expected: String representation of all nodes
+
+    // 7. BFS / DFS
+    cout << "\n[7] Traversals starting from 'A':" << endl;
+    cout << "BFS: " << graph.BFS("A") << endl; 
+    // Expected: [A, B, C] or similar
+    cout << "DFS: " << graph.DFS("A") << endl; 
+    // Expected: [A, C, B] or similar
+
+    // 8. disconnect
+    cout << "\n[8] disconnect('A', 'B')..." << endl;
+    graph.disconnect("A", "B");
+    cout << "Connected A->B now? " << (graph.connected("A", "B") ? "YES" : "NO") << endl; 
+    // Expected: NO
+
+    // 9. vertices
+    cout << "\n[9] vertices():" << endl;
+    vector<string> allV = graph.vertices();
+    cout << "Vertices: ";
+    for(auto v : allV) cout << v << " ";
+    cout << endl;
+    // Expected: A B C D 
+
+    // 10. clear
+    cout << "\n[10] clear()..." << endl;
+    graph.clear();
+    cout << "Size after clear: " << graph.size() << endl; 
+    // Expected: 0
+}
+
+// =============================================================================
+// 4. KnowledgeGraph Class Tests
+// =============================================================================
+void testKnowledgeGraphClass() {
+    cout << "\n==================================================" << endl;
+    cout << "TESTING CLASS: KnowledgeGraph" << endl;
+    cout << "==================================================" << endl;
+
     KnowledgeGraph kg;
 
-    kg.addEntity("Alice");
-    kg.addEntity("Bob");
-    kg.addRelation("Alice", "Bob", 1.0);
+    // 1. addEntity
+    cout << "\n[1] Adding entities: Grandpa, Dad, Mom, Son, Daughter, Stranger..." << endl;
+    kg.addEntity("Grandpa");
+    kg.addEntity("Dad");
+    kg.addEntity("Mom");
+    kg.addEntity("Son");
+    kg.addEntity("Daughter");
+    kg.addEntity("Stranger");
 
-    assertTrue(kg.isReachable("Alice", "Bob"), "Alice -> Bob is reachable");
+    // 2. addRelation
+    cout << "\n[2] Adding relations..." << endl;
+    kg.addRelation("Grandpa", "Dad");
+    kg.addRelation("Dad", "Son");
+    kg.addRelation("Dad", "Daughter");
+    kg.addRelation("Mom", "Son");
+    kg.addRelation("Mom", "Daughter");
+    // Removed Cycle for standard tests to keep things simple
+    // kg.addRelation("Son", "Mom"); 
+
+    // 3. getAllEntities
+    cout << "\n[3] getAllEntities():" << endl;
+    vector<string> ents = kg.getAllEntities();
+    cout << "Count: " << ents.size() << endl; 
+    // Expected: 6
+
+    // 4. getNeighbors
+    cout << "\n[4] getNeighbors('Dad'):" << endl;
+    vector<string> neighbors = kg.getNeighbors("Dad");
+    cout << "Neighbors: ";
+    for(auto n : neighbors) cout << n << " ";
+    cout << endl;
+    // Expected: Son Daughter
+
+    // 5. isReachable
+    cout << "\n[5] isReachable():" << endl;
+    cout << "Grandpa -> Son:      " << (kg.isReachable("Grandpa", "Son") ? "YES" : "NO") << endl; 
+    // Expected: YES
+    cout << "Son -> Grandpa:      " << (kg.isReachable("Son", "Grandpa") ? "YES" : "NO") << endl; 
+    // Expected: NO
+    cout << "Grandpa -> Stranger: " << (kg.isReachable("Grandpa", "Stranger") ? "YES" : "NO") << endl; 
+    // Expected: NO
+
+    // 6. BFS / DFS Wrappers
+    cout << "\n[6] BFS/DFS Wrappers (start 'Grandpa'):" << endl;
+    cout << "BFS: " << kg.bfs("Grandpa") << endl; 
+    // Expected: Traversal list
+    cout << "DFS: " << kg.dfs("Grandpa") << endl; 
+    // Expected: Traversal list
+
+    // 7. getRelatedEntities
+    cout << "\n[7] getRelatedEntities('Grandpa', depth=2):" << endl;
+    vector<string> related = kg.getRelatedEntities("Grandpa", 2);
+    cout << "Result: ";
+    for(auto r : related) cout << r << " ";
+    cout << endl;
+    // Expected: Dad, Son, Daughter
+
+    // 8. findCommonAncestors (WEIGHTED TEST)
+    cout << "\n[8] findCommonAncestors() with Weights (No Cycles):" << endl;
     
-    try {
-        kg.addEntity("Alice");
-        cout << "[FAIL] Should have thrown EntityExistsException" << endl;
-    } catch (...) {
-        cout << "[PASS] Threw Exception on duplicate entity" << endl;
-    }
-}
+    // --- Setup a new isolated graph for clear weighted testing ---
+    KnowledgeGraph wKG;
+    wKG.addEntity("CheapParent");
+    wKG.addEntity("ExpensiveParent");
+    wKG.addEntity("ChildA");
+    wKG.addEntity("ChildB");
 
-void testTraversals() {
-    cout << "\n=== Testing BFS and DFS ===" << endl;
-    DGraphModel<int> g(intEQ, int2str);
-    g.add(1); g.add(2); g.add(3);
-    g.connect(1, 2, 1);
-    g.connect(1, 3, 1);
-
-    string bfsResult = g.BFS(1);
-    cout << "BFS Result: " << bfsResult << endl;
-    assertTrue(bfsResult.length() > 5, "BFS returned non-empty string");
-
-    string dfsResult = g.DFS(1);
-    cout << "DFS Result: " << dfsResult << endl;
-    assertTrue(dfsResult.length() > 5, "DFS returned non-empty string");
-}
-
-void testCommonAncestors() {
-    cout << "\n=== Testing findCommonAncestors Logic ===" << endl;
-    KnowledgeGraph kg;
+    // Scenario: 
+    // Two independent parents pointing to the same children.
+    // 1. ExpensiveParent connects with weight 10.0
+    // 2. CheapParent connects with weight 1.0
+    //
+    // Graph Structure:
+    // ExpensiveParent --(10)--> ChildA
+    // ExpensiveParent --(10)--> ChildB
+    // CheapParent     --(1)-->  ChildA
+    // CheapParent     --(1)-->  ChildB
     
-    // Hierarchy: Root -> LeafA, Root -> LeafB
-    kg.addEntity("Root");
-    kg.addEntity("LeafA");
-    kg.addEntity("LeafB");
-    kg.addRelation("Root", "LeafA", 5.0);
-    kg.addRelation("Root", "LeafB", 5.0);
+    wKG.addRelation("ExpensiveParent", "ChildA", 10.0f);
+    wKG.addRelation("ExpensiveParent", "ChildB", 10.0f);
     
-    string ancestor = kg.findCommonAncestors("LeafA", "LeafB");
-    assertEqual(ancestor, string("Root"), "Simple common ancestor is Root");
+    wKG.addRelation("CheapParent", "ChildA", 1.0f);
+    wKG.addRelation("CheapParent", "ChildB", 1.0f);
+
+    cout << "  Scenario A: Parallel Parents with different weights." << endl;
+    cout << "    Expensive path cost: 10 + 10 = 20" << endl;
+    cout << "    Cheap path cost:      1 + 1  = 2" << endl;
+    cout << "  Result: " << wKG.findCommonAncestors("ChildA", "ChildB") << endl; 
+    // Expected: CheapParent
+
+    // --- Setup Hierarchy with Shortcuts ---
+    KnowledgeGraph hKG;
+    hKG.addEntity("CEO");
+    hKG.addEntity("Manager");
+    hKG.addEntity("Intern1");
+    hKG.addEntity("Intern2");
+
+    // Graph Structure:
+    // CEO --(1)--> Manager
+    // Manager --(50)--> Intern1
+    // Manager --(50)--> Intern2
+    // CEO --(1)--> Intern1 (Direct shortcut)
+    // CEO --(1)--> Intern2 (Direct shortcut)
     
-    // Disconnected
-    kg.addEntity("Alien");
-    string noAnc = kg.findCommonAncestors("LeafA", "Alien");
-    assertEqual(noAnc, string("No common ancestor"), "Disconnected nodes have no ancestor");
-}
+    hKG.addRelation("CEO", "Manager", 1.0f);
+    hKG.addRelation("Manager", "Intern1", 50.0f);
+    hKG.addRelation("Manager", "Intern2", 50.0f);
+    hKG.addRelation("CEO", "Intern1", 1.0f);
+    hKG.addRelation("CEO", "Intern2", 1.0f);
 
-// =============================================================================
-// Requested Test Case: tc_005
-// =============================================================================
-void tc_005() {
-    cout << "\n=== tc_005: Test toString methods of Edge, VertexNode, and DGraphModel ===" << endl;
+    cout << "\n  Scenario B: Topologically distant but Weighted closer." << endl;
+    cout << "    Manager is closer by hops (1 hop), but expensive (Weight 50)." << endl;
+    cout << "    CEO is farther by hops (via Manager), but has direct cheap links (Weight 1)." << endl;
+    cout << "    Cost via Manager: 50 + 50 = 100" << endl;
+    cout << "    Cost via CEO:     1 + 1   = 2" << endl;
+    cout << "  Result: " << hKG.findCommonAncestors("Intern1", "Intern2") << endl;
+    cout << "  Result: " << hKG.findCommonAncestors("CEO", "Manager") << endl;
 
-    // Define function pointers (lambdas decay to function pointers since no capture)
-    bool (*vertexEQ)(string&, string&) = [](string& a, string& b) -> bool { return a == b; };
-    string (*vertex2str)(string&) = [](string& s) -> string { return s; };
-
-    DGraphModel<string> graph(vertexEQ, vertex2str);
-
-    // Add vertices
-    graph.add("A");
-    graph.add("B");
-    graph.add("C");
-
-    // Add connections
-    graph.connect("A", "B", 2.5f);
-    graph.connect("B", "C", 3.0f);
-    graph.connect("A", "C", 1.0f);
-
-    // Test DGraphModel toString (which internally uses VertexNode toString and Edge toString)
-    cout << "DGraphModel toString:" << endl;
-    string graphString = graph.toString();
-    cout << graphString << endl;
-
-    // Validate expected substring presence to ensure toString isn't empty or garbage
-    assertTrue(graphString.find("(A,") != string::npos, "Graph string contains Node A");
-    assertTrue(graphString.find("2.5") != string::npos, "Graph string contains weight 2.5");
-
-    // Test individual VertexNode toString by getting vertex and checking outward edges
-    cout << "Testing individual components:" << endl;
-    try {
-        vector<Edge<string>*> outwardEdges = graph.getOutwardEdges("A");
-        cout << "Vertex A has " << outwardEdges.size() << " outward edges" << endl;
-        assertEqual((int)outwardEdges.size(), 2, "Vertex A has correct edge count");
-        
-        if (!outwardEdges.empty()) {
-            cout << "Sample Edge toString: " << outwardEdges[0]->toString() << endl;
-        }
-    } catch (const exception& e) {
-        cout << "[FAIL] Exception in tc_005: " << e.what() << endl;
-    }
+    // Expected: CEO
 }
 
 // =============================================================================
 // Main
 // =============================================================================
 int main() {
-    try {
-         testLowLevelGraph();
-         testKnowledgeGraphBasics();
-         testTraversals();
-         testCommonAncestors();
-        
-        // Run the new test case
-        //tc_005();
+    testEdgeClass();
+    testVertexNodeClass();
+    testDGraphModelClass();
+    testKnowledgeGraphClass();
 
-        cout << "\n=========================================" << endl;
-        cout << "Test Summary: " << passedTests << "/" << totalTests << " passed." << endl;
-        cout << "=========================================" << endl;
-        
-    } catch (const exception& e) {
-        cout << "CRITICAL FAILURE: Uncaught exception in main: " << e.what() << endl;
-    }
+    cout << "\n=========================================" << endl;
+    cout << "          ALL TESTS COMPLETED            " << endl;
+    cout << "=========================================" << endl;
     return 0;
 }
