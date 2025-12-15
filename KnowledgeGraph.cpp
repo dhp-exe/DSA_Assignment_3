@@ -1,10 +1,4 @@
 #include "KnowledgeGraph.h"
-#include <unordered_map>
-#include <unordered_set>
-#include <queue>
-#include <limits>
-#include <functional>
-#include <cmath>
 
 // =============================================================================
 // Class Edge Implementation
@@ -55,21 +49,24 @@ VertexNode<T>::VertexNode(T vertex, bool (*vertexEQ)(T&, T&), string (*vertex2st
 
 template <class T>
 void VertexNode<T>::connect(VertexNode<T>* to, float weight) {
-    // TODO: Connect this vertex to the 'to' vertex
-    // Edge already exists, update weight
+    // Check if edge already exists (outgoing)
     for(Edge<T>* edge : adList) {
-        if (edge->to == to) {
+        if (edge->to == to && edge->from == this) {
             edge->weight = weight;
             return;
         }
     }
+    
     // Create new edge
     Edge<T>* newEdge = new Edge<T>(this, to, weight);
-    adList.push_back(newEdge);
+    
+    this->adList.push_back(newEdge); 
+    to->adList.push_back(newEdge);   
 
     this->outDegree_++;
     to->inDegree_++;
 }
+
 template <class T>
 T& VertexNode<T>::getVertex() {
     return this->vertex;
@@ -97,18 +94,26 @@ bool VertexNode<T>::equals(VertexNode<T>* node){
 
 template <class T>
 void VertexNode<T>::removeTo(VertexNode<T>* to) {
-    for (auto it = adList.begin(); it != adList.end(); it++) {
-        if ((*it)->to == to) {
-            Edge<T>* edgeToRemove = *it;
-            delete edgeToRemove;
 
-            adList.erase(it);
+    for (auto it = adList.begin(); it != adList.end(); it++) {
+        if ((*it)->to == to && (*it)->from == this) {
+            Edge<T>* edgeToRemove = *it;
+            for(auto it2 = to->adList.begin(); it2 != to->adList.end(); ++it2) {
+                if (*it2 == edgeToRemove) {
+                    to->adList.erase(it2);
+                    break;
+                }
+            }
+            delete edgeToRemove; // Delete the actual edge object
+            adList.erase(it);    // Remove from 'this' list
+            
             this->outDegree_--;
             to->inDegree_--;
             return;
         }
     }
 }
+
 template <class T>
 int VertexNode<T>::inDegree(){
     return this->inDegree_;
@@ -154,12 +159,17 @@ DGraphModel<T>::~DGraphModel() {
 
 template <class T>
 void DGraphModel<T>::clear() {
+    // Delete all Edges
     for (VertexNode<T>* node : nodeList) {
         for (Edge<T>* edge : node->adList) {
-            delete edge;
+            if (edge->from == node) {
+                delete edge;
+            }
         }
-        node->adList.clear();
+        node->adList.clear(); // Clear the list pointers
     }
+
+    // Delete all Vertices
     for (VertexNode<T>* node : nodeList) {
         delete node;
     }
@@ -264,7 +274,14 @@ vector<Edge<T>*> DGraphModel<T>::getOutwardEdges(T from) {
     VertexNode<T>* fromNode = this->getVertexNode(from);
     if(!fromNode) throw VertexNotFoundException("Vertex not found");
 
-    return fromNode->adList;
+    // return only outgoing edges
+    vector<Edge<T>*> outward;
+    for (Edge<T>* edge : fromNode->adList) {
+        if (edge->from == fromNode) {
+            outward.push_back(edge);
+        }
+    }
+    return outward;
 }
 
 template <class T>
@@ -332,10 +349,20 @@ string DGraphModel<T>::BFS(T start) {
         VertexNode<T>* current = queue[head++];
         
         if (!first) ss << ", ";
-        ss << current->toString(); // use toString() of VertexNode
+
+        if(this->vertex2str != nullptr){
+            ss << this->vertex2str(current->vertex);
+        }
+        else{
+            ss << current->toString();
+        }
+
         first = false;
 
         for (Edge<T>* edge : current->adList) {
+
+            if (edge->from != current) continue; // only consider outward edges
+
             VertexNode<T>* neighbor = edge->to;
             bool seen = false;
             for(auto v : visited) if(v == neighbor) seen = true;
@@ -374,12 +401,29 @@ string DGraphModel<T>::DFS(T start) {
         if (!seen) {
             visited.push_back(current);
             if (!first) ss << ", ";
-            ss << current->toString(); // use toString() of VertexNode
+
+            if(this->vertex2str != nullptr){
+                ss << this->vertex2str(current->vertex);
+            }
+            else{
+                ss << current->toString(); 
+            }
+
             first = false;
 
-            // Push neighbors in reverse to maintain order
+            // Push neighbors in reverse to maintain processing order
             for (int i = current->adList.size() - 1; i >= 0; i--) {
-                stack.push_back(current->adList[i]->to);
+                Edge<T>* edge = current->adList[i];
+                
+                if (edge->from != current) continue; 
+
+                VertexNode<T>* neighbor = edge->to;
+                bool seenNeighbor = false;
+                for(auto v : visited) if(v == neighbor) seenNeighbor = true;
+                
+                if (!seenNeighbor) {
+                    stack.push_back(neighbor);
+                }
             }
         }
     }
