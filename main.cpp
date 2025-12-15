@@ -230,7 +230,7 @@ void testKnowledgeGraphClass() {
     kg.addEntity("Mom");
     kg.addEntity("Son");
     kg.addEntity("Daughter");
-    kg.addEntity("Stranger");
+    kg.addEntity("Roblox");
 
     // 2. addRelation
     cout << "\n[2] Adding relations..." << endl;
@@ -239,6 +239,8 @@ void testKnowledgeGraphClass() {
     kg.addRelation("Dad", "Daughter");
     kg.addRelation("Mom", "Son");
     kg.addRelation("Mom", "Daughter");
+    kg.addRelation("Son", "Roblox");
+    kg.addRelation("Daughter", "Roblox");
     // Removed Cycle for standard tests to keep things simple
     // kg.addRelation("Son", "Mom"); 
 
@@ -262,7 +264,7 @@ void testKnowledgeGraphClass() {
     // Expected: YES
     cout << "Son -> Grandpa:      " << (kg.isReachable("Son", "Grandpa") ? "YES" : "NO") << endl; 
     // Expected: NO
-    cout << "Grandpa -> Stranger: " << (kg.isReachable("Grandpa", "Stranger") ? "YES" : "NO") << endl; 
+    cout << "Grandpa -> Roblox: " << (kg.isReachable("Grandpa", "Roblox") ? "YES" : "NO") << endl; 
     // Expected: NO
 
     // 6. BFS / DFS Wrappers

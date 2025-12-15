@@ -16,11 +16,26 @@ string Edge<T>::toString() {
     stringstream ss;
     // Format: (<from>, <to>, <weight>)
     ss << "(";
-    ss << (from ? (from->vertex2str ? from->vertex2str(from->vertex) : "NULL") : "NULL"); 
-    ss << ", ";
-    ss << (to ? (to->vertex2str ? to->vertex2str(to->vertex) : "NULL") : "NULL");       
     
-    // set precision for weight
+    // If vertex2str exists, use it. Otherwise, print vertex directly.
+    if (from) {
+        if (from->vertex2str) ss << from->vertex2str(from->vertex);
+        else ss << from->vertex;
+    } 
+    else {
+        ss << "NULL";
+    }
+    
+    ss << ", ";
+    
+    if (to) {
+        if (to->vertex2str) ss << to->vertex2str(to->vertex);
+        else ss << to->vertex;
+    } 
+    else {
+        ss << "NULL";
+    }
+    
     ss.precision(6);
     ss.setf(std::ios::fixed, std::ios::floatfield);
     
@@ -134,7 +149,14 @@ string VertexNode<T>::toString(){
     stringstream ss;
     // Format: (<value>, <in>, <out>, [<edges>])
     ss << "(";
-    ss << (vertex2str ? vertex2str(vertex) : ""); // Print value
+    
+    // If vertex2str exists, use it. Otherwise, print vertex directly.
+    if (this->vertex2str) {
+        ss << this->vertex2str(this->vertex);
+    } else {
+        ss << this->vertex;
+    }
+    
     ss << ", " << inDegree_ << ", " << outDegree_ << ", [";
     
     for (size_t i = 0; i < adList.size(); ++i) {
