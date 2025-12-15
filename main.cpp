@@ -152,13 +152,13 @@ void tc_005() {
 // =============================================================================
 int main() {
     try {
-        // testLowLevelGraph();
-        // testKnowledgeGraphBasics();
-        // testTraversals();
-        // testCommonAncestors();
+         testLowLevelGraph();
+         testKnowledgeGraphBasics();
+         testTraversals();
+         testCommonAncestors();
         
         // Run the new test case
-        tc_005();
+        //tc_005();
 
         cout << "\n=========================================" << endl;
         cout << "Test Summary: " << passedTests << "/" << totalTests << " passed." << endl;

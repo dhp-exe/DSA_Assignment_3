@@ -558,91 +558,111 @@ vector<string> KnowledgeGraph::getRelatedEntities(string entity, int depth) {
     return result;
 }
 
+// Helper: check if vector contains a value
+static bool kg_containsVec(const vector<string> &vec, const string &val) {
+    for (size_t i = 0; i < vec.size(); ++i) if (vec[i] == val) return true;
+    return false;
+}
+
+// Helper: get direct parents (incoming neighbors) of a node by scanning entities
+static vector<string> kg_getParents(const vector<string> &entities, DGraphModel<string> &graph, const string &target) {
+    vector<string> parents;
+    for (size_t i = 0; i < entities.size(); ++i) {
+        const string &potentialParent = entities[i];
+        if (graph.connected(potentialParent, target)) parents.push_back(potentialParent);
+    }
+    return parents;
+}
+
+// Collect all ancestors (reverse BFS) for a start node. Excludes the start node itself.
+static vector<string> kg_collectAncestors(const vector<string> &entities, DGraphModel<string> &graph, const string &start) {
+    vector<string> ancestors;
+    vector<string> q;
+    q.push_back(start);
+    size_t head = 0;
+    while (head < q.size()) {
+        string curr = q[head++];
+        vector<string> pars = kg_getParents(entities, graph, curr);
+        for (size_t i = 0; i < pars.size(); ++i) {
+            const string &p = pars[i];
+            if (!kg_containsVec(ancestors, p)) {
+                ancestors.push_back(p);
+                q.push_back(p);
+            }
+        }
+    }
+    return ancestors;
+}
+
+// Helper: get index of entity in entities vector
+static int kg_indexOf(const vector<string> &entities, const string &val) {
+    for (size_t i = 0; i < entities.size(); ++i) if (entities[i] == val) return (int)i;
+    return -1;
+}
+
+// Dijkstra-like shortest path (by weight) using simple arrays (no extra libraries)
+static double kg_shortestPath(const vector<string> &entities, DGraphModel<string> &graph, const string &src, const string &dst) {
+    const double INF = HUGE_VAL;
+    int n = (int)entities.size();
+    if (n == 0) return INF;
+    vector<double> dist(n, INF);
+    vector<int> used(n, 0);
+    int sidx = kg_indexOf(entities, src);
+    int didx = kg_indexOf(entities, dst);
+    if (sidx < 0 || didx < 0) return INF;
+    dist[sidx] = 0.0;
+
+    for (int iter = 0; iter < n; ++iter) {
+        int u = -1;
+        double best = INF;
+        for (int i = 0; i < n; ++i) {
+            if (!used[i] && dist[i] < best) {
+                best = dist[i];
+                u = i;
+            }
+        }
+        if (u == -1) break;
+        if (u == didx) return dist[u];
+        used[u] = 1;
+
+        vector<Edge<string>*> edges = graph.getOutwardEdges(entities[u]);
+        for (size_t ei = 0; ei < edges.size(); ++ei) {
+            Edge<string>* e = edges[ei];
+            string v = e->getTo()->getVertex();
+            int vidx = kg_indexOf(entities, v);
+            if (vidx < 0 || used[vidx]) continue;
+            double nd = dist[u] + e->getWeight();
+            if (nd < dist[vidx]) dist[vidx] = nd;
+        }
+    }
+    return INF;
+}
+
 string KnowledgeGraph::findCommonAncestors(string entity1, string entity2) {
     if (!graph.contains(entity1) || !graph.contains(entity2)) {
         throw EntityNotFoundException("Entity not found");
     }
-    
-    // Helper: get direct parents (incoming neighbors) of a node by scanning entities
-    auto getParents = [&](const string &target) -> vector<string> {
-        vector<string> parents;
-        for (const string &potentialParent : entities) {
-            if (graph.connected(potentialParent, target)) {
-                parents.push_back(potentialParent);
-            }
-        }
-        return parents;
-    };
 
-    // Collect all ancestors (reverse BFS) for a start node. Excludes the start node itself.
-    auto collectAncestors = [&](const string &start) -> unordered_set<string> {
-        unordered_set<string> ancestors;
-        vector<string> q;
-        q.push_back(start);
-        size_t head = 0;
-        while (head < q.size()) {
-            string curr = q[head++];
-            vector<string> pars = getParents(curr);
-            for (const string &p : pars) {
-                if (ancestors.insert(p).second) {
-                    q.push_back(p);
-                }
-            }
-        }
-        return ancestors;
-    };
-
-    unordered_set<string> ancestors1 = collectAncestors(entity1);
-    unordered_set<string> ancestors2 = collectAncestors(entity2);
+    vector<string> ancestors1 = kg_collectAncestors(entities, graph, entity1);
+    vector<string> ancestors2 = kg_collectAncestors(entities, graph, entity2);
 
     // Intersection of ancestor sets
     vector<string> common;
-    for (const string &a : ancestors1) {
-        if (ancestors2.count(a)) common.push_back(a);
+    for (size_t i = 0; i < ancestors1.size(); ++i) {
+        const string &a = ancestors1[i];
+        if (kg_containsVec(ancestors2, a)) common.push_back(a);
     }
     if (common.empty()) return "No common ancestor";
 
-    // Dijkstra shortest path (by weight) from src -> dst. Returns +inf if unreachable.
-    auto shortestPath = [&](const string &src, const string &dst) -> double {
-        const double INF = std::numeric_limits<double>::infinity();
-        unordered_map<string, double> dist;
-        for (const string &v : entities) dist[v] = INF;
-
-        // min-heap by distance
-        auto cmp = [](const pair<double, string> &a, const pair<double, string> &b) { return a.first > b.first; };
-        priority_queue<pair<double, string>, vector<pair<double, string>>, decltype(cmp)> pq(cmp);
-
-        dist[src] = 0.0;
-        pq.push({0.0, src});
-
-        while (!pq.empty()) {
-            auto cur = pq.top(); pq.pop();
-            double d = cur.first;
-            const string u = cur.second;
-            if (d > dist[u]) continue;
-            if (u == dst) return d;
-
-            vector<Edge<string>*> edges = graph.getOutwardEdges(u);
-            for (Edge<string>* e : edges) {
-                string v = e->getTo()->getVertex();
-                double nd = d + e->getWeight();
-                if (nd < dist[v]) {
-                    dist[v] = nd;
-                    pq.push({nd, v});
-                }
-            }
-        }
-        return std::numeric_limits<double>::infinity();
-    };
-
-    const double INF = std::numeric_limits<double>::infinity();
+    const double INF = HUGE_VAL;
     double bestScore = INF;
     string bestAncestor = "";
 
     // For each common ancestor, compute sum of shortest-path weights to both entities
-    for (const string &cand : common) {
-        double d1 = shortestPath(cand, entity1);
-        double d2 = shortestPath(cand, entity2);
+    for (size_t i = 0; i < common.size(); ++i) {
+        const string &cand = common[i];
+        double d1 = kg_shortestPath(entities, graph, cand, entity1);
+        double d2 = kg_shortestPath(entities, graph, cand, entity2);
         if (d1 == INF || d2 == INF) continue; // must reach both
         double total = d1 + d2;
         if (total < bestScore) {
